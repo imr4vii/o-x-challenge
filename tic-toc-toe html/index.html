@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Smart Tic Tac Toe</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f0f0f0;
+      text-align: center;
+      margin: 0;
+      padding: 20px;
+    }
+
+    h1 {
+      margin-bottom: 10px;
+    }
+
+    .scoreboard {
+      margin: 10px 0;
+      font-size: 1rem;
+    }
+
+    .board {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 5px;
+      max-width: 300px;
+      margin: 20px auto;
+    }
+
+    .cell {
+      width: 100%;
+      aspect-ratio: 1;
+      background: white;
+      font-size: 2.5rem;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      border: 2px solid #333;
+      cursor: pointer;
+    }
+
+    .status {
+      margin-top: 15px;
+      font-size: 1.2rem;
+    }
+
+    .restart {
+      margin-top: 10px;
+      padding: 10px 20px;
+      font-size: 1rem;
+      cursor: pointer;
+    }
+
+    .footer {
+      margin-top: 30px;
+      font-size: 0.9rem;
+      color: #555;
+    }
+
+    .confetti {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 1000;
+    }
+
+    @media (max-width: 500px) {
+      .cell {
+        font-size: 2rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <h1>Tic Tac Toe vs Smart AI</h1>
+
+  <div>
+    <label for="username">Enter Your Name: </label>
+    <input type="text" id="username" placeholder="Your name" />
+    <button onclick="setUsername()">Start</button>
+  </div>
+
+  <div class="scoreboard">
+    <span id="xWins">You: 0</span> |
+    <span id="oWins">AI: 0</span> |
+    <span id="draws">Draws: 0</span>
+  </div>
+
+  <div class="board" id="board"></div>
+  <div class="status" id="status"></div>
+  <button class="restart" onclick="startGame()">Restart</button>
+
+  <canvas class="confetti" id="confettiCanvas"></canvas>
+
+  <audio id="moveSound" src="https://www.soundjay.com/button/beep-07.wav"></audio>
+  <audio id="winSound" src="https://www.soundjay.com/button/button-3.wav"></audio>
+  <audio id="drawSound" src="https://www.soundjay.com/button/button-4.wav"></audio>
+
+  <div class="footer">Made by Ravi</div>
+
+  <script>
+    const board = document.getElementById('board');
+    const statusText = document.getElementById('status');
+    const moveSound = document.getElementById('moveSound');
+    const winSound = document.getElementById('winSound');
+    const drawSound = document.getElementById('drawSound');
+    const xWinsEl = document.getElementById('xWins');
+    const oWinsEl = document.getElementById('oWins');
+    const drawsEl = document.getElementById('draws');
+    const confettiCanvas = document.getElementById('confettiCanvas');
+
+    let boardState = Array(9).fill('');
+    let gameOver = false;
+    let scores = { X: 0, O: 0, Draw: 0 };
+    let username = 'You';
+
+    const winCombos = [
+      [0,1,2], [3,4,5], [6,7,8],
+      [0,3,6], [1,4,7], [2,5,8],
+      [0,4,8], [2,4,6]
+    ];
+
+    function setUsername() {
+      const input = document.getElementById('username');
+      if (input.value.trim()) {
+        username = input.value.trim();
+        startGame();
+      }
+    }
+
+    function startGame() {
+      board.innerHTML = '';
+      boardState = Array(9).fill('');
+      gameOver = false;
+      statusText.textContent = `${username}'s Turn (X)`;
+      updateScoreboard();
+
+      for (let i = 0; i < 9; i++) {
+        const cell = document.createElement('div');
+        cell.classList.add('cell');
+        cell.dataset.index = i;
+        cell.addEventListener('click', () => handleClick(i));
+        board.appendChild(cell);
+      }
+    }
+
+    function handleClick(index) {
+      if (boardState[index] || gameOver) return;
+      makeMove(index, 'X');
+      if (!gameOver) setTimeout(aiTurn, 300);
+    }
+
+    function makeMove(index, player) {
+      boardState[index] = player;
+      board.children[index].textContent = player;
+      moveSound.play();
+
+      if (checkWin(player)) {
+        statusText.textContent = player === 'X' ? `${username} Wins!` : 'AI Wins!';
+        scores[player]++;
+        gameOver = true;
+        winSound.play();
+        updateScoreboard();
+        if (player === 'X') launchConfetti();
+        return;
+      }
+
+      if (!boardState.includes('')) {
+        statusText.textContent = "It's a Draw!";
+        scores.Draw++;
+        gameOver = true;
+        drawSound.play();
+        updateScoreboard();
+        return;
+      }
+
+      statusText.textContent = player === 'X' ? "AI's Turn (O)" : `${username}'s Turn (X)`;
+    }
+
+    function updateScoreboard() {
+      xWinsEl.textContent = `${username}: ${scores.X}`;
+      oWinsEl.textContent = `AI: ${scores.O}`;
+      drawsEl.textContent = `Draws: ${scores.Draw}`;
+    }
+
+    function aiTurn() {
+      const bestMove = minimax(boardState, 'O').index;
+      makeMove(bestMove, 'O');
+    }
+
+    function minimax(newBoard, player) {
+      const availSpots = newBoard.map((v, i) => v === '' ? i : null).filter(v => v !== null);
+
+      if (checkWinner(newBoard, 'X')) return { score: -10 };
+      if (checkWinner(newBoard, 'O')) return { score: 10 };
+      if (availSpots.length === 0) return { score: 0 };
+
+      const moves = [];
+
+      for (let i = 0; i < availSpots.length; i++) {
+        const move = {};
+        move.index = availSpots[i];
+        newBoard[availSpots[i]] = player;
+
+        if (player === 'O') {
+          const result = minimax(newBoard, 'X');
+          move.score = result.score;
+        } else {
+          const result = minimax(newBoard, 'O');
+          move.score = result.score;
+        }
+
+        newBoard[availSpots[i]] = '';
+        moves.push(move);
+      }
+
+      let bestMove;
+      if (player === 'O') {
+        let bestScore = -Infinity;
+        for (let i = 0; i < moves.length; i++) {
+          if (moves[i].score > bestScore) {
+            bestScore = moves[i].score;
+            bestMove = i;
+          }
+        }
+      } else {
+        let bestScore = Infinity;
+        for (let i = 0; i < moves.length; i++) {
+          if (moves[i].score < bestScore) {
+            bestScore = moves[i].score;
+            bestMove = i;
+          }
+        }
+      }
+
+      return moves[bestMove];
+    }
+
+    function checkWin(player) {
+      return winCombos.some(combo => combo.every(i => boardState[i] === player));
+    }
+
+    function checkWinner(state, player) {
+      return winCombos.some(combo => combo.every(i => state[i] === player));
+    }
+
+    function launchConfetti() {
+      const confetti = confettiCanvas.getContext('2d');
+      confetti.clearRect(0, 0, confettiCanvas.width, confettiCanvas.height);
+      confettiCanvas.width = window.innerWidth;
+      confettiCanvas.height = window.innerHeight;
+      for (let i = 0; i < 100; i++) {
+        const x = Math.random() * confettiCanvas.width;
+        const y = Math.random() * confettiCanvas.height;
+        const size = Math.random() * 10 + 5;
+        confetti.fillStyle = `hsl(${Math.random() * 360}, 100%, 50%)`;
+        confetti.fillRect(x, y, size, size);
+      }
+      setTimeout(() => confetti.clearRect(0, 0, confettiCanvas.width, confettiCanvas.height), 2000);
+    }
+
+    startGame();
+  </script>
+</body>
+</html>
